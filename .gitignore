@@ -207,6 +207,11 @@ marimo/_lsp/
 __marimo__/
 
 #data files
-data/
+notebook/data/
 logs/
+artifacts/
+__pycache__/
+venv/
+logs/
+**/*.csv
 
