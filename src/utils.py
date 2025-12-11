@@ -3,7 +3,8 @@ from sklearn.base import BaseEstimator, TransformerMixin
 import pandas as pd
 import os
 import dill
-
+from src.logger import logging
+import pickle
 class FrequencyEncoder(BaseEstimator, TransformerMixin):
     def __init__(self):
         self.freq_maps={}
@@ -29,3 +30,12 @@ def save_object_preprocessor(file_path,obj):
 
     with open(file_path,'wb') as file:
         dill.dump(obj,file)
+
+
+def save_object_model(file_path,obj):
+    dir_path=os.path.dirname(file_path)
+    os.makedirs(dir_path,exist_ok=True)
+
+    with open(file_path,'wb') as file:
+        pickle.dump(obj,file)
+

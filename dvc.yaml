@@ -14,3 +14,13 @@ stages:
     - src/components/data_transformation.py
     outs:
     - artifacts/preprocessor.pkl
+  training:
+    cmd: python -m src.components.model_training
+    deps:
+    - artifacts/X_test.csv
+    - artifacts/X_train.csv
+    - artifacts/y_test.csv
+    - artifacts/y_train.csv
+    - src/components/model_training.py
+    outs:
+    - artifacts/model.pkl

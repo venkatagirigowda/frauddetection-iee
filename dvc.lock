@@ -29,10 +29,38 @@ stages:
       size: 297657396
     - path: src/components/data_transformation.py
       hash: md5
-      md5: 3493f180b615ba50d6c4609d370dfa3c
-      size: 6218
+      md5: 630626aeb3508a3c2cd66722e07c7f88
+      size: 5443
     outs:
     - path: artifacts/preprocessor.pkl
       hash: md5
       md5: 371df985ede172058a1e7f66e010351d
       size: 77450
+  training:
+    cmd: python -m src.components.model_training
+    deps:
+    - path: artifacts/X_test.csv
+      hash: md5
+      md5: faf3072b5b378eb06f8fe27a8f1d3863
+      size: 325935491
+    - path: artifacts/X_train.csv
+      hash: md5
+      md5: f17e473a96048a79022c79cbb13b5f81
+      size: 1306004105
+    - path: artifacts/y_test.csv
+      hash: md5
+      md5: 9050e44d7590da74411f76ceffb97aa1
+      size: 354333
+    - path: artifacts/y_train.csv
+      hash: md5
+      md5: 5f7378a8155a7cc1f0d2212bfb0a8606
+      size: 1417305
+    - path: src/components/model_training.py
+      hash: md5
+      md5: b25fc24f7d6b8bf28c7bf7881ea01b61
+      size: 6534
+    outs:
+    - path: artifacts/model.pkl
+      hash: md5
+      md5: 317880e6c3a58cf8e0593dddd8fad33c
+      size: 67362008

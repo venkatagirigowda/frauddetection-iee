@@ -215,8 +215,8 @@ __pycache__/
 venv/
 logs/
 **/*.csv
-artifacts/X_train.npy
-artifacts/X_test.npy
-artifacts/y_test.npy
-artifacts/y_train.npy
+artifacts/X_train.csv
+artifacts/X_test.csv
+artifacts/y_test.csv
+artifacts/y_train.csv
 /artifacts

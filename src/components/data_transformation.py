@@ -9,15 +9,14 @@ import sys
 from src.utils import FrequencyEncoder
 import pandas as pd
 from src.utils import save_object_preprocessor
-import numpy as np
 
 @dataclass
 class DataTransformationConfig:
     preprocessor_obj_file_path:str=os.path.join('artifacts','preprocessor.pkl')
-    Xtrain_data_path=os.path.join('artifacts','X_train.npy')
-    Xtest_data_path=os.path.join('artifacts','X_test.npy')
-    ytrain_data_path=os.path.join('artifacts','y_train.npy')
-    ytest_data_path=os.path.join('artifacts','y_test.npy')
+    Xtrain_data_path=os.path.join('artifacts','X_train.csv')
+    Xtest_data_path=os.path.join('artifacts','X_test.csv')
+    ytrain_data_path=os.path.join('artifacts','y_train.csv')
+    ytest_data_path=os.path.join('artifacts','y_test.csv')
 
 class DataTransformation:
     def __init__(self):
@@ -84,48 +83,30 @@ class DataTransformation:
 
             logging.info("preprocessing applied/completed")
             
-            """def get_feature_names(ct):
-             names = []
-             for name, trans, cols in ct.transformers_:
-                 if name != 'remainder':
-                  if hasattr(trans, "get_feature_names_out"):
-                   names.extend(trans.get_feature_names_out(cols))
-                  else:
-                      names.extend(cols)
-             return names
-            
+            def get_feature_names(ct):
+                names = []
+                for name, trans, cols in ct.transformers_:
+                    if name != 'remainder':
+                        if hasattr(trans, "get_feature_names_out"):
+                            names.extend(trans.get_feature_names_out(cols))
+                        else:
+                             names.extend(cols)
+                return names
+
             train_cols = get_feature_names(preprocessor)
 
-            X_train_transformed = pd.DataFrame(X_train_preprocessed, columns=train_cols)
-            X_test_transformed = pd.DataFrame(X_test_preprocessed, columns=train_cols)
+            X_train_df = pd.DataFrame(X_train_preprocessed, columns=train_cols)
+            X_test_df = pd.DataFrame(X_test_preprocessed, columns=train_cols)
+            
+            logging.info("saving X,y train test csv files")
+            X_train_df.to_csv(self.data_transformation.Xtrain_data_path,index=False,header=True)
+            X_test_df.to_csv(self.data_transformation.Xtest_data_path,index=False,header=True)
+            y_train.to_csv(self.data_transformation.ytrain_data_path,index=False,header=True)
+            y_test.to_csv(self.data_transformation.ytest_data_path,index=False,header=True)
+            
+            logging.info("X,y train test csv files saved")
 
-            pca = PCA(n_components=0.95, random_state=42)
-            X_train_pca = pca.fit_transform(X_train_transformed)
-            X_test_pca = pca.transform(X_test_transformed)
-
-            df_augmentation = pd.DataFrame(X_train_transformed.copy())
-            df_augmentation["isFraud"] = y_train.values
-
-            #using mhsysgen for augmentation my original augmentation technique
-
-            mh = MHSysGen(method="parallel", ratio=15, minority_class=1)
-
-        
-            X_train_aug, y_train_aug = mh.fit_resample(df_augmentation, target="isFraud")
-    
-
-            X_aug_pca = pca.transform(X_train_aug)
-
-            save_object_preprocessor(file_path=self.data_transformation.preprocessor_obj_file_path,
-                        obj=preprocessing_obj)
-
-            return(X_aug_pca,y_train_aug,X_test_pca,y_test)"""
-            logging.info("saving preprocessor obj")
-            np.save(self.data_transformation.Xtrain_data_path,X_train_preprocessed)
-            np.save(self.data_transformation.Xtest_data_path,X_test_preprocessed)
-            np.save(self.data_transformation.ytrain_data_path,y_train)
-            np.save(self.data_transformation.ytest_data_path,y_test)
-
+            logging.info("saving preprocessor object")
             save_object_preprocessor(file_path=self.data_transformation.preprocessor_obj_file_path,obj=preprocessor)
             logging.info("preprocessor obj saved successfully")
 
