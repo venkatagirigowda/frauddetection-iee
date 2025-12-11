@@ -1,0 +1,4 @@
+artifacts/X_train.npy
+artifacts/X_test.npy
+artifacts/y_test.npy
+artifacts/y_train.npy

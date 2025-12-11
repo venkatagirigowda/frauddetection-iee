@@ -1,6 +1,9 @@
 #frequency encoding 
 from sklearn.base import BaseEstimator, TransformerMixin
 import pandas as pd
+import os
+import dill
+
 class FrequencyEncoder(BaseEstimator, TransformerMixin):
     def __init__(self):
         self.freq_maps={}
@@ -18,3 +21,11 @@ class FrequencyEncoder(BaseEstimator, TransformerMixin):
         for col in X.columns:
             X_transformed[col]=X_transformed[col].map(self.freq_maps[col]).fillna(0)
         return X_transformed
+    
+
+def save_object_preprocessor(file_path,obj):
+    dir_path=os.path.dirname(file_path)
+    os.makedirs(dir_path,exist_ok=True)
+
+    with open(file_path,'wb') as file:
+        dill.dump(obj,file)

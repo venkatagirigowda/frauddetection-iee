@@ -4,6 +4,7 @@ from src.exception import CustomException
 from dataclasses import dataclass
 import os
 import sys
+from src.components.data_transformation import DataTransformation
 
 @dataclass
 class DataIngestionConfig:
@@ -35,17 +36,13 @@ class DataIngestion:
 
             logging.info("data ingestion complete")
 
-            return(
-                self.ingestion_config.train_data_path,
-                self.ingestion_config.test_data_path
-            )
         except Exception as e:
             raise CustomException(e,sys)
 
 if __name__=='__main__':
     data_ingestion_obj=DataIngestion()
-    train_data,test_data=data_ingestion_obj.initiate_data_ingestion()
-
+    data_ingestion_obj.initiate_data_ingestion()
+    
 
 
    

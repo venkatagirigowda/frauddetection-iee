@@ -209,9 +209,14 @@ __marimo__/
 #data files
 notebook/data/
 logs/
-artifacts/
+artifacts/test.csv
+artifacts/train.csv
 __pycache__/
 venv/
 logs/
 **/*.csv
-
+artifacts/X_train.npy
+artifacts/X_test.npy
+artifacts/y_test.npy
+artifacts/y_train.npy
+/artifacts

@@ -1,0 +1,38 @@
+schema: '2.0'
+stages:
+  ingestion:
+    cmd: python -m src.components.data_ingestion
+    deps:
+    - path: src/components/data_ingestion.py
+      hash: md5
+      md5: 39cecbaa78caefc102cba46a6b352264
+      size: 1622
+    outs:
+    - path: artifacts/test.csv
+      hash: md5
+      md5: cc3c9ebb24d17409cdd859b1f8c13810
+      size: 74333966
+    - path: artifacts/train.csv
+      hash: md5
+      md5: 561353bfe6ddd9dfc307ddee7e617650
+      size: 297657396
+  transformation:
+    cmd: python -m src.components.data_transformation
+    deps:
+    - path: artifacts/test.csv
+      hash: md5
+      md5: cc3c9ebb24d17409cdd859b1f8c13810
+      size: 74333966
+    - path: artifacts/train.csv
+      hash: md5
+      md5: 561353bfe6ddd9dfc307ddee7e617650
+      size: 297657396
+    - path: src/components/data_transformation.py
+      hash: md5
+      md5: 3493f180b615ba50d6c4609d370dfa3c
+      size: 6218
+    outs:
+    - path: artifacts/preprocessor.pkl
+      hash: md5
+      md5: 371df985ede172058a1e7f66e010351d
+      size: 77450
