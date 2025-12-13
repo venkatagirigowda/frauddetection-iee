@@ -16,7 +16,7 @@ jobs:
     
     # Define ECR repository name and EC2 SSH user as environment variables
     env:
-      ECR_REPOSITORY: fraud-predictor-app # <<< REPLACE with your ECR Repo Name
+      ECR_REPOSITORY: fraud-detection # <<< REPLACE with your ECR Repo Name
       EC2_SSH_USER: ubuntu # <<< REPLACE with your EC2 Linux username (e.g., ubuntu, ec2-user)
 
     steps:
