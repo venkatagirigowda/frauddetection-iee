@@ -220,4 +220,3 @@ artifacts/X_test.csv
 artifacts/y_test.csv
 artifacts/y_train.csv
 /artifacts
-.dvc/config.local

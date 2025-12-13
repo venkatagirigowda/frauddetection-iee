@@ -13,7 +13,9 @@ from sklearn.metrics import classification_report,confusion_matrix
 from src.utils import save_object_model
 import mlflow
 from sklearn.metrics import f1_score,roc_auc_score,confusion_matrix
+from dataclasses import dataclass
 
+@dataclass
 class ModelTrainingConfig():
     model_obj_file_path=os.path.join("artifacts","model.pkl")
 
@@ -79,7 +81,8 @@ class ModelTrainer():
                     'colsample_bytree':0.8,
                     'scale_pos_weight':1,
                     'random_state':42,
-                    'eval_metric':"logloss" 
+                    'eval_metric':"logloss" ,
+                    'n_jobs':8
                 }
                 mlflow.log_params({f"xgb_{k}": v for k, v in XGB_PARAMS.items()})
                 model_xgb = XGBClassifier( **XGB_PARAMS)

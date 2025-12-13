@@ -9,10 +9,13 @@ import sys
 from src.utils import FrequencyEncoder
 import pandas as pd
 from src.utils import save_object_preprocessor
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
 
 @dataclass
 class DataTransformationConfig:
     preprocessor_obj_file_path:str=os.path.join('artifacts','preprocessor.pkl')
+    fe_obj_file_path = os.path.join('artifacts', 'feature_engineering.pkl')
     Xtrain_data_path=os.path.join('artifacts','X_train.csv')
     Xtest_data_path=os.path.join('artifacts','X_test.csv')
     ytrain_data_path=os.path.join('artifacts','y_train.csv')
@@ -49,6 +52,10 @@ class DataTransformation:
             X_train=fe.fit_transform(X_train)
             X_test=fe.transform(X_test)
 
+            save_object_preprocessor(file_path=self.data_transformation.fe_obj_file_path, obj=fe)
+            logging.info("feature engineering obj saved successfully")
+
+            
             engineered_features = [
                  'Transaction_Hour', 'Transaction_DayOfWeek', 'Transaction_Day',
                  'card1_Count', 'card1_Amt_Mean', 'card1_Amt_Std',
@@ -63,19 +70,34 @@ class DataTransformation:
                  X_test.drop(columns=['TransactionDT'], inplace=True)
                  numeric_cols.remove('TransactionDT')
             
-            #Frequency Encoder is in utils.py
+            numerical_transfromer=Pipeline(steps=[
+                ('simpleimputernum',SimpleImputer(strategy='median')),
+                ('standardscaler',StandardScaler())
+            ])
 
-            ohe = OneHotEncoder(drop='first', sparse_output=False, handle_unknown='ignore')
-            oe = OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1)
-            freq = FrequencyEncoder()
-            scaler = StandardScaler()
+            nominal_transformer=Pipeline(steps=[
+                ('simpleimputercat',SimpleImputer(strategy='most_frequent')),
+                ('ohe',OneHotEncoder(handle_unknown='ignore',drop='first', sparse_output=False))
+            ])
+
+            ordinal_transformer=Pipeline(steps=[
+                ('simpleimputercat',SimpleImputer(strategy='most_frequent')),
+                ('oe',OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1))
+            ])
+           
+            #Frequency Encoder is in utils.py
+            frequency_transformer=Pipeline(steps=[
+                ('simpleimputercat',SimpleImputer(strategy='most_frequent')),
+                ('fe',FrequencyEncoder())
+            ])
+
 
             preprocessor = ColumnTransformer(
             transformers=[
-                ("nominal", ohe, nominal_cols),
-                ("ordinal", oe, ordinal_cols),
-                ("freq", freq, nominal_high), # nominal_high columns has high cardinality categorical features 
-                ("num", scaler, [col for col in numeric_cols if col in X_train.columns]), 
+                ("nominal", nominal_transformer, nominal_cols),
+                ("ordinal", ordinal_transformer, ordinal_cols),
+                ("frequency", frequency_transformer, nominal_high), # nominal_high columns has high cardinality categorical features 
+                ("numerical", numerical_transfromer, [col for col in numeric_cols if col in X_train.columns]), 
                   ],remainder='drop')
             
             X_train_preprocessed = preprocessor.fit_transform(X_train)
@@ -86,13 +108,11 @@ class DataTransformation:
             def get_feature_names(ct):
                 names = []
                 for name, trans, cols in ct.transformers_:
-                    if name != 'remainder':
-                        if hasattr(trans, "get_feature_names_out"):
-                            names.extend(trans.get_feature_names_out(cols))
-                        else:
-                             names.extend(cols)
+                    if name == 'nominal':
+                        names.extend(trans.get_feature_names_out(cols))
+                    elif name != 'remainder':
+                        names.extend(cols)
                 return names
-
             train_cols = get_feature_names(preprocessor)
 
             X_train_df = pd.DataFrame(X_train_preprocessed, columns=train_cols)
@@ -107,7 +127,8 @@ class DataTransformation:
             logging.info("X,y train test csv files saved")
 
             logging.info("saving preprocessor object")
-            save_object_preprocessor(file_path=self.data_transformation.preprocessor_obj_file_path,obj=preprocessor)
+
+            save_object_preprocessor(file_path=self.data_transformation.preprocessor_obj_file_path, obj=preprocessor)
             logging.info("preprocessor obj saved successfully")
 
         except Exception as e:

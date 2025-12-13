@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fraud Prediction API Service</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+        h1 { color: #333; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        .status-box { background: #e9ecef; padding: 15px;  border-radius: 5px; margin-bottom: 20px; }
+        .status-box strong { color: #007bff; }
+        form { margin-top: 20px; padding: 20px; border: 1px dashed #ccc; border-radius: 5px; }
+        input[type="file"] { margin-bottom: 15px; }
+        input[type="submit"] { background-color: #28a745; color: white; padding: 10px 15px; border: none; border-radius: 5px; cursor: pointer; }
+        input[type="submit"]:hover { background-color: #218838; }
+        pre { background: #f8f9fa; padding: 10px; border: 1px solid #dee2e6; overflow-x: auto; max-height: 300px; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>💳 IEEE Fraud Detection Prediction Service</h1>
+        <p>This is a synchronous API endpoint designed for low-latency batch scoring .</p>
+
+        <div class="status-box">
+            <p><strong>API Status:</strong> UP</p>
+            <p><strong>ML Model Status:</strong> 
+                {% if model_status == 'READY' %}
+                    <span style="color: green;">{{ model_status }}</span> (Ready to predict)
+                {% else %}
+                    <span class="error">{{ model_status }}</span> (Prediction may fail)
+                {% endif %}
+            </p>
+        </div>
+
+        <h2>Upload CSV for Prediction</h2>
+        <form id="uploadForm" action="/uploadfile/predict" method="post" enctype="multipart/form-data">
+            <label for="file">Select CSV File (Max 100 Rows):</label><br>
+            <input type="file" id="file" name="file" accept=".csv" required><br><br>
+            <input type="submit" value="Get Fraud Predictions">
+        </form>
+
+        <h2>Prediction Result</h2>
+        <pre id="resultOutput">Upload a file and submit the form to see the JSON prediction results here...</pre>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const form = event.target;
+            const formData = new FormData(form);
+            const resultOutput = document.getElementById('resultOutput');
+            resultOutput.textContent = 'Processing request...';
+            
+            try {
+                const response = await fetch(form.action, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultOutput.textContent = JSON.stringify(data, null, 2);
+                } else {
+                    resultOutput.innerHTML = `<span class="error">Error (${response.status}):</span><br>${JSON.stringify(data, null, 2)}`;
+                }
+            } catch (error) {
+                resultOutput.innerHTML = `<span class="error">Network Error:</span> ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>

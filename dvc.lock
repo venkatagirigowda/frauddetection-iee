@@ -29,13 +29,13 @@ stages:
       size: 297657396
     - path: src/components/data_transformation.py
       hash: md5
-      md5: 630626aeb3508a3c2cd66722e07c7f88
-      size: 5443
+      md5: 91ba205ffea7df62c1425905dd772636
+      size: 6424
     outs:
     - path: artifacts/preprocessor.pkl
       hash: md5
-      md5: 371df985ede172058a1e7f66e010351d
-      size: 77450
+      md5: d870547cc898d2fe68a9b12dc4c2529a
+      size: 80425
   training:
     cmd: python -m src.components.model_training
     deps:
@@ -57,10 +57,10 @@ stages:
       size: 1417305
     - path: src/components/model_training.py
       hash: md5
-      md5: b25fc24f7d6b8bf28c7bf7881ea01b61
-      size: 6534
+      md5: 7a9f1900b6d5bdb02bd158cf61f1caf2
+      size: 6614
     outs:
     - path: artifacts/model.pkl
       hash: md5
-      md5: 317880e6c3a58cf8e0593dddd8fad33c
-      size: 67362008
+      md5: 11adb314677d2b105612168b03bbf500
+      size: 67499096
