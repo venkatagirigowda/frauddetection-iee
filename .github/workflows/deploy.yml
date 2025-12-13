@@ -64,26 +64,40 @@ jobs:
 
       # 4. Deploy on EC2 (Uses the dedicated SSH Action)
       - name: Deploy on EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3 # Handles key injection automatically
+        uses: appleboy/ssh-action@v1.0.3 
         with:
           host: ${{ secrets.EC2_HOST_IP }}
           username: ${{ env.EC2_SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # The script to run on the EC2 instance
           script: |
             echo "--- Starting EC2 Deployment ---"
             
-            # Use ECR_REGISTRY_URL directly on EC2
             ECR_PATH="${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:latest"
             CONTAINER_NAME="fraud-detection"
+            REGION="${{ secrets.AWS_REGION }}"
+            REGISTRY_URL="${{ env.ECR_REGISTRY_URL }}"
             
-            # Log in to ECR on the EC2 instance (Uses the IAM Role for security!)
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | sudo docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY_URL }}
+            # --- FIX: Retrieve the password and store it in an environment variable ---
+            echo "Attempting ECR login..."
+            # 1. Get the password using the EC2's IAM Role
+            # Note: We run this command as the current user (ubuntu) who has the AWS CLI setup.
+            ECR_PASSWORD=$(aws ecr get-login-password --region $REGION)
+            
+            # 2. Use the password to log in via a heredoc (safer than a pipe)
+            # The password is provided to sudo docker login
+            echo $ECR_PASSWORD | sudo docker login --username AWS --password-stdin $REGISTRY_URL
+            
+            # Check if login was successful before continuing
+            if [ $? -ne 0 ]; then
+                echo "ECR LOGIN FAILED. ABORTING DEPLOYMENT."
+                exit 1
+            fi
             
             # Pull the latest image
             echo "Pulling latest image: $ECR_PATH"
             sudo docker pull $ECR_PATH
             
+            # The rest of your script remains the same...
             # Stop and remove the old container
             if sudo docker ps -a | grep -q $CONTAINER_NAME; then
               echo "Stopping and removing existing container: $CONTAINER_NAME"
