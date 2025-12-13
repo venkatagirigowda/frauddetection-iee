@@ -4,112 +4,75 @@ on:
   push:
     branches:
       - main
-    # Optional: Keep paths filter if you only want to run CI/CD for changes in these folders/files
     paths:
-      - "api_service/**" # Improved glob pattern for subdirectories
+      - "api_service/"
       - "Dockerfile"
       - ".github/workflows/deploy.yml"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
-    # Define ECR repository name and EC2 SSH user as environment variables
+
     env:
-      ECR_REPOSITORY: fraud-detection # <<< REPLACE with your ECR Repo Name
-      EC2_SSH_USER: ubuntu # <<< REPLACE with your EC2 Linux username (e.g., ubuntu, ec2-user)
+      AWS_REGION: ap-south-1
+      ECR_REPOSITORY: fraud-detection
+      CONTAINER_NAME: fraud-detection
+      EC2_SSH_USER: ubuntu
 
     steps:
+      # ⿡ Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. Configure AWS Credentials (Needed for the ECR Login action)
+      # ⿢ Configure AWS credentials (CI ONLY)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # 2. Login to Amazon ECR (Uses the dedicated AWS Action)
+      # ⿣ Login to Amazon ECR
       - name: Login to Amazon ECR
-        id: login-ecr # We use an ID to reference the output later
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-      
-      # Set the ECR_REGISTRY_URL variable from the login step's output
-      - name: Set ECR Registry URL Variable
-        id: set_registry_url
-        run: echo "ECR_REGISTRY_URL=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_ENV
-      
-      # 3. Build, Tag, and Push Docker Image to ECR
-      - name: Build, Tag, and Push Docker Image
-        run: |
-          IMAGE_TAG=${{ github.sha }} 
-          
-          # 1. Build the image - PASSING AWS SECRETS AS BUILD ARGUMENTS
-          docker build \
-            --build-arg AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
-            --build-arg AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-            -t fraud-detection .
-          
-          # 2. Tag the image... (rest of the tagging/pushing commands)
-          docker tag fraud-detection:latest \
-            ${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
 
-      # 4. Deploy on EC2 (Uses the dedicated SSH Action)
-      - name: Deploy on EC2 via SSH
-        uses: appleboy/ssh-action@v1.0.3 
+      # ⿤ Build, tag, push Docker image
+      - name: Build and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # ⿥ Deploy on EC2 via SSH
+      - name: Deploy on EC2
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST_IP }}
           username: ${{ env.EC2_SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "--- Starting EC2 Deployment ---"
-            
-            # --- FIX: Ensure AWS CLI is installed on the HOST EC2 machine ---
-            # This is required to run the 'aws ecr get-login-password' command successfully.
-            if ! command -v aws &> /dev/null
-            then
-                echo "AWS CLI not found on EC2 host. Installing now..."
-                # Use sudo to run these installation commands on the host OS
-                sudo apt update -y
-                sudo apt install awscli -y
-            fi
-            
-            ECR_PATH="${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:latest"
-            CONTAINER_NAME="fraud-detection"
-            REGION="${{ secrets.AWS_REGION }}"
-            REGISTRY_URL="${{ env.ECR_REGISTRY_URL }}"
-            
-            # 1. Get the password using the EC2's IAM Role
-            # This command now works because aws is installed on the host.
-            ECR_PASSWORD=$(aws ecr get-login-password --region $REGION)
-            
-            # 2. Use the password to log in via a heredoc (safer than a pipe)
-            echo $ECR_PASSWORD | sudo docker login --username AWS --password-stdin $REGISTRY_URL
-            
-            # Check if login was successful before continuing
-            if [ $? -ne 0 ]; then
-                echo "ECR LOGIN FAILED. Check IAM permissions or ECR path."
-                exit 1
-            fi
-            
-            # Pull the latest image
-            echo "Pulling latest image: $ECR_PATH"
-            sudo docker pull $ECR_PATH
-            
-            # Stop and remove the old container
-            if sudo docker ps -a | grep -q $CONTAINER_NAME; then
-              echo "Stopping and removing existing container: $CONTAINER_NAME"
-              sudo docker stop $CONTAINER_NAME || true
-              sudo docker rm $CONTAINER_NAME || true
-            fi
-            
-            # Run the new container
-            echo "Running new container..."
+            set -e
+
+            echo "Logging in to ECR..."
+            aws ecr get-login-password --region $AWS_REGION | \
+              sudo docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+
+            IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest"
+
+            echo "Pulling latest image..."
+            sudo docker pull $IMAGE
+
+            echo "Stopping old container (if exists)..."
+            sudo docker stop ${{ env.CONTAINER_NAME }} || true
+            sudo docker rm ${{ env.CONTAINER_NAME }} || true
+
+            echo "Starting new container..."
             sudo docker run -d \
-              --name $CONTAINER_NAME \
+              --name ${{ env.CONTAINER_NAME }} \
               -p 8000:8000 \
-              $ECR_PATH
-            
-            echo "Deployment Complete."
+              $IMAGE
+
+            echo "Deployment completed successfully"
