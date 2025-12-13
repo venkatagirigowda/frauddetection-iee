@@ -4,19 +4,26 @@ on:
   push:
     branches:
       - main
+    # Optional: Keep paths filter if you only want to run CI/CD for changes in these folders/files
     paths:
-      - "api_service/"
+      - "api_service/**" # Improved glob pattern for subdirectories
       - "Dockerfile"
       - ".github/workflows/deploy.yml"
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    
+    # Define ECR repository name and EC2 SSH user as environment variables
+    env:
+      ECR_REPOSITORY: fraud-predictor-app # <<< REPLACE with your ECR Repo Name
+      EC2_SSH_USER: ubuntu # <<< REPLACE with your EC2 Linux username (e.g., ubuntu, ec2-user)
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 1. Configure AWS Credentials (Needed for the ECR Login action)
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -24,30 +31,71 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      # 2. Login to Amazon ECR (Uses the dedicated AWS Action)
       - name: Login to Amazon ECR
+        id: login-ecr # We use an ID to reference the output later
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      # Set the ECR_REGISTRY_URL variable from the login step's output
+      - name: Set ECR Registry URL Variable
+        id: set_registry_url
+        run: echo "ECR_REGISTRY_URL=${{ steps.login-ecr.outputs.registry }}" >> $GITHUB_ENV
+      
+      # 3. Build, Tag, and Push Docker Image to ECR
+      - name: Build, Tag, and Push Docker Image
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-          | docker login --username AWS --password-stdin \
-            ${{ secrets.ECR_REGISTRY }}
-
-      - name: Build Docker image
-        run: |
+          IMAGE_TAG=${{ github.sha }} # Use the commit hash for a unique tag
+          
+          # 1. Build the image
           docker build -t fraud-detection .
+          
+          # 2. Tag the image with the full ECR path and unique tag
           docker tag fraud-detection:latest \
-            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+            ${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+            
+          # 3. Push the unique tag and the 'latest' tag
+          docker push ${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
+          
+          # Re-tag and push 'latest' for convenience on the EC2 side
+          docker tag fraud-detection:latest \
+            ${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:latest
+            
+          docker push ${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:latest
 
-      - name: Push image to ECR
-        run: |
-          docker push \
-            ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
-
-      - name: Deploy on EC2
-        run: |
-          ssh ubuntu@${{ secrets.EC2_HOST_IP }} << 'EOF'
-            docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
-            docker stop fraud-detection || true
-            docker rm fraud-detection || true
-            docker run -d \
-              --name fraud-detection \
+      # 4. Deploy on EC2 (Uses the dedicated SSH Action)
+      - name: Deploy on EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3 # Handles key injection automatically
+        with:
+          host: ${{ secrets.EC2_HOST_IP }}
+          username: ${{ env.EC2_SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # The script to run on the EC2 instance
+          script: |
+            echo "--- Starting EC2 Deployment ---"
+            
+            # Use ECR_REGISTRY_URL directly on EC2
+            ECR_PATH="${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:latest"
+            CONTAINER_NAME="fraud-detection"
+            
+            # Log in to ECR on the EC2 instance (Uses the IAM Role for security!)
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | sudo docker login --username AWS --password-stdin ${{ env.ECR_REGISTRY_URL }}
+            
+            # Pull the latest image
+            echo "Pulling latest image: $ECR_PATH"
+            sudo docker pull $ECR_PATH
+            
+            # Stop and remove the old container
+            if sudo docker ps -a | grep -q $CONTAINER_NAME; then
+              echo "Stopping and removing existing container: $CONTAINER_NAME"
+              sudo docker stop $CONTAINER_NAME || true
+              sudo docker rm $CONTAINER_NAME || true
+            fi
+            
+            # Run the new container
+            echo "Running new container..."
+            sudo docker run -d \
+              --name $CONTAINER_NAME \
               -p 8000:8000 \
-              ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+              $ECR_PATH
+            
+            echo "Deployment Complete."
