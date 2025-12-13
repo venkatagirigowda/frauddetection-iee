@@ -72,24 +72,31 @@ jobs:
           script: |
             echo "--- Starting EC2 Deployment ---"
             
+            # --- FIX: Ensure AWS CLI is installed on the HOST EC2 machine ---
+            # This is required to run the 'aws ecr get-login-password' command successfully.
+            if ! command -v aws &> /dev/null
+            then
+                echo "AWS CLI not found on EC2 host. Installing now..."
+                # Use sudo to run these installation commands on the host OS
+                sudo apt update -y
+                sudo apt install awscli -y
+            fi
+            
             ECR_PATH="${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:latest"
             CONTAINER_NAME="fraud-detection"
             REGION="${{ secrets.AWS_REGION }}"
             REGISTRY_URL="${{ env.ECR_REGISTRY_URL }}"
             
-            # --- FIX: Retrieve the password and store it in an environment variable ---
-            echo "Attempting ECR login..."
             # 1. Get the password using the EC2's IAM Role
-            # Note: We run this command as the current user (ubuntu) who has the AWS CLI setup.
+            # This command now works because aws is installed on the host.
             ECR_PASSWORD=$(aws ecr get-login-password --region $REGION)
             
             # 2. Use the password to log in via a heredoc (safer than a pipe)
-            # The password is provided to sudo docker login
             echo $ECR_PASSWORD | sudo docker login --username AWS --password-stdin $REGISTRY_URL
             
             # Check if login was successful before continuing
             if [ $? -ne 0 ]; then
-                echo "ECR LOGIN FAILED. ABORTING DEPLOYMENT."
+                echo "ECR LOGIN FAILED. Check IAM permissions or ECR path."
                 exit 1
             fi
             
@@ -97,7 +104,6 @@ jobs:
             echo "Pulling latest image: $ECR_PATH"
             sudo docker pull $ECR_PATH
             
-            # The rest of your script remains the same...
             # Stop and remove the old container
             if sudo docker ps -a | grep -q $CONTAINER_NAME; then
               echo "Stopping and removing existing container: $CONTAINER_NAME"
