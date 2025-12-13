@@ -44,23 +44,17 @@ jobs:
       # 3. Build, Tag, and Push Docker Image to ECR
       - name: Build, Tag, and Push Docker Image
         run: |
-          IMAGE_TAG=${{ github.sha }} # Use the commit hash for a unique tag
+          IMAGE_TAG=${{ github.sha }} 
           
-          # 1. Build the image
-          docker build -t fraud-detection .
+          # 1. Build the image - PASSING AWS SECRETS AS BUILD ARGUMENTS
+          docker build \
+            --build-arg AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+            --build-arg AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+            -t fraud-detection .
           
-          # 2. Tag the image with the full ECR path and unique tag
+          # 2. Tag the image... (rest of the tagging/pushing commands)
           docker tag fraud-detection:latest \
             ${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
-            
-          # 3. Push the unique tag and the 'latest' tag
-          docker push ${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG
-          
-          # Re-tag and push 'latest' for convenience on the EC2 side
-          docker tag fraud-detection:latest \
-            ${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:latest
-            
-          docker push ${{ env.ECR_REGISTRY_URL }}/${{ env.ECR_REPOSITORY }}:latest
 
       # 4. Deploy on EC2 (Uses the dedicated SSH Action)
       - name: Deploy on EC2 via SSH
