@@ -49,7 +49,7 @@ jobs:
         docker push \
         $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-    # ⿧ Deploy on EC2 via SSH
+    # ⿧ Deploy on EC2 via SSH (FIXED)
     - name: Deploy on EC2
       uses: appleboy/ssh-action@v1.0.3
       with:
@@ -59,8 +59,8 @@ jobs:
         script: |
           set -e
           docker rm -f fraud_detect || true
-          docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker pull ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/fraud-detection:latest
           docker run -d \
             -p 8000:8000 \
             --name fraud_detect \
-            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG 
+            ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/fraud-detection:latest 
