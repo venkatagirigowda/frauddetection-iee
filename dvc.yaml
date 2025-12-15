@@ -14,6 +14,7 @@ stages:
     - src/components/data_transformation.py
     outs:
     - artifacts/preprocessor.pkl
+    - artifacts/feature_engineering.pkl
   training:
     cmd: python -m src.components.model_training
     deps:

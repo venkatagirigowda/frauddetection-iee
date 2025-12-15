@@ -1,0 +1,9 @@
+.git
+.gitignore
+__pycache__/
+*.pyc
+
+.dvc/cache
+notebook/
+.env
+mlruns/

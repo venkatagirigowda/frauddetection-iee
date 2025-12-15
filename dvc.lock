@@ -32,6 +32,10 @@ stages:
       md5: 91ba205ffea7df62c1425905dd772636
       size: 6424
     outs:
+    - path: artifacts/feature_engineering.pkl
+      hash: md5
+      md5: 0c889ace033876b64efb0c7d2a450e1b
+      size: 942530
     - path: artifacts/preprocessor.pkl
       hash: md5
       md5: d870547cc898d2fe68a9b12dc4c2529a

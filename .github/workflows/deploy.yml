@@ -1,78 +1,66 @@
-name: Build & Deploy Fraud Detection API
+name: Deploy Fraud Detection API
 
 on:
   push:
     branches:
       - main
-    paths:
-      - "api_service/"
-      - "Dockerfile"
-      - ".github/workflows/deploy.yml"
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: ieee-fraud-ml
+  IMAGE_TAG: latest
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
-    env:
-      AWS_REGION: ap-south-1
-      ECR_REPOSITORY: fraud-detection
-      CONTAINER_NAME: fraud-detection
-      EC2_SSH_USER: ubuntu
-
     steps:
-      # ⿡ Checkout code
-      - name: Checkout code
-        uses: actions/checkout@v4
+    # ⿡ Checkout code
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      # ⿢ Configure AWS credentials (CI ONLY)
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+    # ⿢ Configure AWS credentials
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
 
-      # ⿣ Login to Amazon ECR
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+    # ⿣ Login to Amazon ECR
+    - name: Login to Amazon ECR
+      uses: aws-actions/amazon-ecr-login@v2
 
-      # ⿤ Build, tag, push Docker image
-      - name: Build and push Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: latest
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+    # ⿤ Build Docker image
+    - name: Build Docker image
+      run: |
+        docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
-      # ⿥ Deploy on EC2 via SSH
-      - name: Deploy on EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST_IP }}
-          username: ${{ env.EC2_SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            set -e
+    # ⿥ Tag Docker image
+    - name: Tag Docker image
+      run: |
+        docker tag $ECR_REPOSITORY:$IMAGE_TAG \
+        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-            echo "Logging in to ECR..."
-            aws ecr get-login-password --region $AWS_REGION | \
-              sudo docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+    # ⿦ Push image to ECR
+    - name: Push Docker image to ECR
+      run: |
+        docker push \
+        $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
 
-            IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest"
-
-            echo "Pulling latest image..."
-            sudo docker pull $IMAGE
-
-            echo "Stopping old container (if exists)..."
-            sudo docker stop ${{ env.CONTAINER_NAME }} || true
-            sudo docker rm ${{ env.CONTAINER_NAME }} || true
-
-            echo "Starting new container..."
-            sudo docker run -d \
-              --name ${{ env.CONTAINER_NAME }} \
-              -p 8000:8000 \
-              $IMAGE
-
-            echo "Deployment completed successfully"
+    # ⿧ Deploy on EC2 via SSH
+    - name: Deploy on EC2
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_KEY }}
+        script: |
+          set -e
+          docker rm -f fraud_app || true
+          docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
+          docker run -d \
+            -p 8000:8000 \
+            --name fraud_app \
+            $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG 

@@ -2,42 +2,54 @@ import pandas as pd
 import numpy as np
 from src.exception import CustomException
 from src.logger import logging
-from fastapisetup.app import ArtifactRegistry
+from fastapisetup.artifact_registry import ArtifactRegistry
+import sys
 
 
 class PredictPipeline:
-    def __init__(self):
-        # ❌ NO FILE LOADING HERE
+    def _init_(self):
+        # No loading here by design
         pass
 
     def predict(self, df: pd.DataFrame):
         try:
-            logging.info("Starting stacking prediction.")
+            logging.info("Starting stacking prediction pipeline.")
 
-            # Fetch in-memory artifacts
-            fe = ArtifactRegistry.feature_engineer
+            # ---- Fetch artifacts ----
+            pipeline = ArtifactRegistry.model
+            fe = ArtifactRegistry.feature_engineering
             pre = ArtifactRegistry.preprocessor
-            pca = ArtifactRegistry.pca_transformer
-            xgb = ArtifactRegistry.base_model_xgb
-            cat = ArtifactRegistry.base_model_cat
-            meta = ArtifactRegistry.meta_model_lr
-            threshold = ArtifactRegistry.optimal_threshold
 
-            if any(v is None for v in [fe, pre, pca, xgb, cat, meta]):
-                raise RuntimeError("Artifacts not loaded")
+            if pipeline is None or fe is None or pre is None:
+                raise RuntimeError("Artifacts not loaded in registry")
 
-            # Pipeline
+            pca = pipeline["pca_transformer"]
+            model_xgb = pipeline["base_model_xgb"]
+            model_cat = pipeline["base_model_cat"]
+            meta_model = pipeline["meta_model_lr"]
+            threshold = pipeline["stacking_threshold"]
+
+            # ---- Feature engineering ----
             df_fe = fe.transform(df.copy())
-            scaled = pre.transform(df_fe)
-            X_pca = pca.transform(scaled)
 
-            p_xgb = xgb.predict_proba(X_pca)[:, 1]
-            p_cat = cat.predict_proba(X_pca)[:, 1]
+            # ---- Preprocessing ----
+            X_scaled = pre.transform(df_fe)
 
+            # ---- PCA ----
+            X_pca = pca.transform(X_scaled)
+
+            # ---- Base model predictions ----
+            p_xgb = model_xgb.predict_proba(X_pca)[:, 1]
+            p_cat = model_cat.predict_proba(X_pca)[:, 1]
+
+            # ---- Stacking ----
             stack_input = np.column_stack([p_xgb, p_cat])
-            proba = meta.predict_proba(stack_input)[:, 1]
 
+            # ---- Meta model ----
+            proba = meta_model.predict_proba(stack_input)[:, 1]
             final_pred = (proba >= threshold).astype(int)
+
+            logging.info("Prediction completed successfully.")
 
             return pd.DataFrame({
                 "fraud_probability": proba,
@@ -45,4 +57,5 @@ class PredictPipeline:
             })
 
         except Exception as e:
-            raise CustomException(e)
+            logging.error("Prediction pipeline failed", exc_info=True)
+            raise CustomException(e,sys)
