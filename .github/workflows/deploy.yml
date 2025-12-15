@@ -58,9 +58,9 @@ jobs:
         key: ${{ secrets.EC2_KEY }}
         script: |
           set -e
-          docker rm -f fraud_app || true
+          docker rm -f fraud_detect || true
           docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG
           docker run -d \
             -p 8000:8000 \
-            --name fraud_app \
+            --name fraud_detect \
             $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:$IMAGE_TAG 
